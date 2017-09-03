@@ -1,0 +1,199 @@
+<html>
+	<head>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+		<script>
+				 			
+var database;
+var items;
+				
+$(document).ready(function() {
+
+	window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || 
+		window.msIndexedDB;
+	window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || 
+		window.msIDBTransaction;
+	window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
+
+	if (!window.indexedDB) {
+		alert("Sorry!Your browser doesn't support IndexedDB");
+	}
+ 
+	function addRecord(record){
+		if(database === undefined){
+			alert('Database is not exists');
+			return;
+		}
+	
+		var transaction = database.transaction(["users"], "readwrite");
+
+		transaction.oncomplete = function () {
+			getAllRecords();
+		};
+		
+		var objectStore = transaction.objectStore("users");
+
+		var request = objectStore.put(record);
+	}
+	
+	function editRecord(id){
+		var transaction = database.transaction(["users"], "readwrite");
+		var objectStore = transaction.objectStore("users");
+		transaction.oncomplete = function(){
+			getAllRecords();
+		};
+		
+		var item = {Name:$('#record' + id).val(), Id:id};
+
+        objectStore.put(item);	
+	}
+	
+	function deleteRecord(id){
+		var transaction = database.transaction(["users"], "readwrite");
+		var objectStore = transaction.objectStore("users");
+		transaction.oncomplete = function(){
+			getAllRecords();
+		};
+
+        objectStore.delete(id);		 
+	}	
+	
+	function getAllRecords(){
+		
+		var transaction = database.transaction("users");
+		var objectStore = transaction.objectStore("users");
+
+		var result = [];
+		
+		transaction.oncomplete = function () {
+			items = result;
+			
+			refreshData();
+		};
+		
+		objectStore.openCursor().onsuccess = function(event) {
+			var cursor = event.target.result;
+			
+			if (cursor) {
+				result.push({Name:cursor.value.Name, Id:cursor.key});
+
+			cursor.continue();
+
+		}};
+				
+		return result;
+	}
+	
+	function createOrOpenDatabase(){
+		var request = window.indexedDB.open("testDb",1);
+		
+		request.onupgradeneeded = function(event) {
+
+			var db = event.target.result;
+
+			var objectStore = db.createObjectStore("users", { keyPath:  "Id", autoIncrement:true});
+		};
+
+		request.onerror = function(event) {
+			alert(event.target.errorCode);
+		};
+		
+		request.onsuccess = function(event) {
+			database = request.result;		
+			getAllRecords();		
+		};	
+	}
+	
+	function refreshData() {
+		var container = $('#data');
+				
+		var testData = items;
+		 				
+		container.empty();		
+				
+		$('<tr/>').appendTo(container).append('<td>Id</td><td>Name</td>');
+			
+				
+		for (var i = 0; i < items.length; i++) {		
+			var tr = $('<tr/>').appendTo(container);	
+				
+			tr.append('<td>' + testData[i].Id + '</td>');
+			tr.append('<td><input type="text" id="record' + testData[i].Id + '" value="' + testData[i].Name + '"/></td>');
+			
+			
+			var id = testData[i].Id;
+			
+			var newEditButton = '<button id="bEditRecord' + id + '">Edit</button>';
+			var newDeleteButton = '<button id="bDeleteRecord' + id + '">Delete</button>';
+			
+			var btnEdit = $(newEditButton);
+			btnEdit.appendTo(tr);
+			
+			var btnDelete = $(newDeleteButton);
+			btnDelete.appendTo(tr);
+			
+			var editHandler = function(id){
+				return function(){
+					editRecord(id);
+				}
+			}(id);
+			
+			var deleteHandler = function(id){
+				return function(){
+					deleteRecord(id);
+				};
+			}(id);
+			
+			btnEdit.click(editHandler);
+			btnDelete.click(deleteHandler);
+		}
+	}	
+	
+	$("#bCreateDb").click(function(){
+		createOrOpenDatabase();		
+    }); 
+	
+	$("#bDeleteDb").click(function(){
+		if(database === undefined)
+			return;
+			
+		database.close();
+			
+		var req = window.indexedDB.deleteDatabase("testDb");	
+			
+		req.onsuccess = function () {
+			console.log("Deleted database successfully");
+		};
+		req.onerror = function () {
+			console.log("Couldn't delete database");
+		};
+		req.onblocked = function () {
+			console.log("Couldn't delete database due to the operation being blocked");
+		};
+		
+		items = [];
+		database = undefined;
+		
+		refreshData(); 
+	});
+	
+	$("#bAdd").click(function(){
+		addRecord({Name:$('#newUser').val()});		 
+    }); 
+}); 
+		</script>
+	</head>
+	<body>
+		
+		<button id="bCreateDb" text="add">Create or Open DB</button> 
+		<button id="bDeleteDb" text="add">Delete DB</button> 
+		
+		<div>
+			<input id="newUser" type="text"/>
+			<button id="bAdd" text="add">Add Record</button> 		
+		</div>
+		<table id="data"/>
+		
+
+	</body>
+</html>
